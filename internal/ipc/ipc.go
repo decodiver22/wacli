@@ -20,11 +20,14 @@ const (
 
 // Request represents a command sent to the sync daemon.
 type Request struct {
-	Command string `json:"command"` // "send_text", "send_file", "ping"
-	To      string `json:"to,omitempty"`
-	Message string `json:"message,omitempty"`
-	File    string `json:"file,omitempty"`
-	Caption string `json:"caption,omitempty"`
+	Command     string `json:"command"` // "send_text", "send_file", "delete_message", "ping"
+	To          string `json:"to,omitempty"`
+	Message     string `json:"message,omitempty"`
+	File        string `json:"file,omitempty"`
+	Caption     string `json:"caption,omitempty"`
+	Chat        string `json:"chat,omitempty"`
+	MsgID       string `json:"msg_id,omitempty"`
+	ForEveryone bool   `json:"for_everyone,omitempty"`
 }
 
 // Response represents the result from the sync daemon.
@@ -43,6 +46,7 @@ type SendTextResult struct {
 // Handler processes incoming IPC requests.
 type Handler interface {
 	SendText(to, message string) (msgID string, err error)
+	DeleteMessage(chat, msgID string, forEveryone bool) error
 }
 
 // Server listens on a Unix socket for IPC requests.
@@ -166,6 +170,21 @@ func (s *Server) processRequest(req Request) Response {
 		}
 		return Response{Success: true, Data: SendTextResult{To: req.To, MsgID: msgID}}
 	
+	case "delete_message":
+		if req.Chat == "" || req.MsgID == "" {
+			return Response{Success: false, Error: "chat and msg_id are required"}
+		}
+		err := s.handler.DeleteMessage(req.Chat, req.MsgID, req.ForEveryone)
+		if err != nil {
+			return Response{Success: false, Error: err.Error()}
+		}
+		return Response{Success: true, Data: map[string]any{
+			"deleted":      true,
+			"chat":         req.Chat,
+			"msg_id":       req.MsgID,
+			"for_everyone": req.ForEveryone,
+		}}
+	
 	default:
 		return Response{Success: false, Error: fmt.Sprintf("unknown command: %s", req.Command)}
 	}
@@ -232,6 +251,27 @@ func (c *Client) Ping() error {
 	if !resp.Success {
 		return fmt.Errorf("%s", resp.Error)
 	}
+	return nil
+}
+
+// DeleteMessage deletes a message via the sync daemon.
+func (c *Client) DeleteMessage(chat, msgID string, forEveryone bool) error {
+	req := Request{
+		Command:     "delete_message",
+		Chat:        chat,
+		MsgID:       msgID,
+		ForEveryone: forEveryone,
+	}
+	
+	resp, err := c.send(req)
+	if err != nil {
+		return err
+	}
+	
+	if !resp.Success {
+		return fmt.Errorf("%s", resp.Error)
+	}
+	
 	return nil
 }
 

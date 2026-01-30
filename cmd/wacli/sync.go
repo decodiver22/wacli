@@ -65,6 +65,34 @@ func (h *syncHandler) SendText(to, message string) (string, error) {
 	return string(msgID), nil
 }
 
+func (h *syncHandler) DeleteMessage(chat, msgID string, forEveryone bool) error {
+	if h.app == nil {
+		return fmt.Errorf("app not initialized")
+	}
+	if h.app.WA() == nil {
+		return fmt.Errorf("whatsapp client not initialized")
+	}
+	if !h.app.WA().IsConnected() {
+		return fmt.Errorf("whatsapp not connected")
+	}
+	
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	
+	chatJID, err := wa.ParseUserOrJID(chat)
+	if err != nil {
+		return fmt.Errorf("parse chat: %w", err)
+	}
+	
+	// Type assert to get the concrete client
+	waClient, ok := h.app.WA().(*wa.Client)
+	if !ok {
+		return fmt.Errorf("unexpected WA client type")
+	}
+	
+	return waClient.RevokeMessage(ctx, chatJID, msgID, forEveryone)
+}
+
 func newSyncCmd(flags *rootFlags) *cobra.Command {
 	var once bool
 	var follow bool
