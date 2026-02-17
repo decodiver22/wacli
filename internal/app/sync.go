@@ -138,6 +138,37 @@ func (a *App) Sync(ctx context.Context, opts SyncOptions) (SyncResult, error) {
 			case disconnected <- struct{}{}:
 			default:
 			}
+		case *events.Archive:
+			if v.Action != nil {
+				_ = a.db.SetChatArchived(v.JID.String(), v.Action.GetArchived())
+				if v.Action.GetArchived() {
+					_ = a.db.SetChatPinned(v.JID.String(), false)
+				}
+			}
+		case *events.Pin:
+			if v.Action != nil {
+				_ = a.db.SetChatPinned(v.JID.String(), v.Action.GetPinned())
+			}
+		case *events.Mute:
+			if v.Action != nil {
+				var mu int64
+				if v.Action.GetMuted() {
+					ms := v.Action.GetMuteEndTimestamp()
+					switch {
+					case ms == -1:
+						mu = -1
+					case ms > 0:
+						mu = ms
+					default:
+						mu = -1
+					}
+				}
+				_ = a.db.SetChatMutedUntil(v.JID.String(), mu)
+			}
+		case *events.MarkChatAsRead:
+			if v.Action != nil {
+				_ = a.db.SetChatUnread(v.JID.String(), !v.Action.GetRead())
+			}
 		}
 	})
 	defer a.wa.RemoveEventHandler(handlerID)

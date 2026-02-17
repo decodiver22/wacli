@@ -290,6 +290,171 @@ func TestCountMessagesAndOldestMessageInfo(t *testing.T) {
 	}
 }
 
+func TestChatStateColumns(t *testing.T) {
+	db := openTestDB(t)
+
+	jid := "123@s.whatsapp.net"
+	if err := db.UpsertChat(jid, "dm", "Alice", time.Now()); err != nil {
+		t.Fatalf("UpsertChat: %v", err)
+	}
+
+	// Defaults should be zero/false.
+	c, err := db.GetChat(jid)
+	if err != nil {
+		t.Fatalf("GetChat: %v", err)
+	}
+	if c.Archived || c.Pinned || c.MutedUntil != 0 || c.Unread {
+		t.Fatalf("expected all state defaults to be zero, got archived=%v pinned=%v muted_until=%d unread=%v",
+			c.Archived, c.Pinned, c.MutedUntil, c.Unread)
+	}
+
+	// Set each state.
+	if err := db.SetChatArchived(jid, true); err != nil {
+		t.Fatalf("SetChatArchived: %v", err)
+	}
+	if err := db.SetChatPinned(jid, true); err != nil {
+		t.Fatalf("SetChatPinned: %v", err)
+	}
+	if err := db.SetChatMutedUntil(jid, -1); err != nil {
+		t.Fatalf("SetChatMutedUntil: %v", err)
+	}
+	if err := db.SetChatUnread(jid, true); err != nil {
+		t.Fatalf("SetChatUnread: %v", err)
+	}
+
+	c, err = db.GetChat(jid)
+	if err != nil {
+		t.Fatalf("GetChat: %v", err)
+	}
+	if !c.Archived {
+		t.Fatal("expected archived=true")
+	}
+	if !c.Pinned {
+		t.Fatal("expected pinned=true")
+	}
+	if c.MutedUntil != -1 {
+		t.Fatalf("expected muted_until=-1, got %d", c.MutedUntil)
+	}
+	if !c.Unread {
+		t.Fatal("expected unread=true")
+	}
+}
+
+func TestChatMutedMethod(t *testing.T) {
+	cases := []struct {
+		name       string
+		mutedUntil int64
+		want       bool
+	}{
+		{"zero", 0, false},
+		{"forever", -1, true},
+		{"future", time.Now().Unix() + 3600, true},
+		{"past", time.Now().Unix() - 3600, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := Chat{MutedUntil: tc.mutedUntil}
+			if got := c.Muted(); got != tc.want {
+				t.Fatalf("Muted()=%v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestListChatsFilters(t *testing.T) {
+	db := openTestDB(t)
+
+	now := time.Now()
+	// Create 3 chats with different states.
+	if err := db.UpsertChat("a@s.whatsapp.net", "dm", "Alice", now.Add(-1*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.UpsertChat("b@g.us", "group", "DevTeam", now.Add(-2*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.UpsertChat("c@s.whatsapp.net", "dm", "Charlie", now); err != nil {
+		t.Fatal(err)
+	}
+
+	_ = db.SetChatArchived("a@s.whatsapp.net", true)
+	_ = db.SetChatPinned("c@s.whatsapp.net", true)
+	_ = db.SetChatMutedUntil("b@g.us", -1)
+	_ = db.SetChatUnread("b@g.us", true)
+
+	// Filter: archived only.
+	trueVal := true
+	falseVal := false
+	chats, err := db.ListChats(ChatListFilter{Archived: &trueVal})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chats) != 1 || chats[0].JID != "a@s.whatsapp.net" {
+		t.Fatalf("archived filter: expected 1 chat (Alice), got %d", len(chats))
+	}
+
+	// Filter: not archived.
+	chats, err = db.ListChats(ChatListFilter{Archived: &falseVal})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chats) != 2 {
+		t.Fatalf("no-archived filter: expected 2 chats, got %d", len(chats))
+	}
+
+	// Filter: pinned.
+	chats, err = db.ListChats(ChatListFilter{Pinned: &trueVal})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chats) != 1 || chats[0].JID != "c@s.whatsapp.net" {
+		t.Fatalf("pinned filter: expected 1 chat (Charlie), got %d", len(chats))
+	}
+
+	// Filter: muted.
+	chats, err = db.ListChats(ChatListFilter{Muted: &trueVal})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chats) != 1 || chats[0].JID != "b@g.us" {
+		t.Fatalf("muted filter: expected 1 chat (DevTeam), got %d", len(chats))
+	}
+
+	// Filter: unread.
+	chats, err = db.ListChats(ChatListFilter{Unread: &trueVal})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chats) != 1 || chats[0].JID != "b@g.us" {
+		t.Fatalf("unread filter: expected 1 chat (DevTeam), got %d", len(chats))
+	}
+
+	// Pinned chats should sort first.
+	chats, err = db.ListChats(ChatListFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chats) != 3 || chats[0].JID != "c@s.whatsapp.net" {
+		t.Fatalf("expected pinned chat first, got %v", chats[0].JID)
+	}
+}
+
+func TestMigrationIdempotent(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "wacli.db")
+
+	db1, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open 1: %v", err)
+	}
+	_ = db1.Close()
+
+	db2, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open 2 (idempotent): %v", err)
+	}
+	_ = db2.Close()
+}
+
 func TestGroupsUpsertListAndParticipantsReplace(t *testing.T) {
 	db := openTestDB(t)
 

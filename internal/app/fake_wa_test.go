@@ -11,6 +11,7 @@ import (
 	"github.com/steipete/wacli/internal/wa"
 	"go.mau.fi/whatsmeow"
 	waProto "go.mau.fi/whatsmeow/binary/proto"
+	"go.mau.fi/whatsmeow/proto/waCommon"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 )
@@ -248,5 +249,21 @@ func (f *fakeWA) Logout(ctx context.Context) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.authed = false
+	return nil
+}
+
+func (f *fakeWA) ArchiveChat(ctx context.Context, target types.JID, archive bool, lastMsgTS time.Time, lastMsgKey *waCommon.MessageKey) error {
+	return nil
+}
+
+func (f *fakeWA) PinChat(ctx context.Context, target types.JID, pin bool) error {
+	return nil
+}
+
+func (f *fakeWA) MuteChat(ctx context.Context, target types.JID, mute bool, duration time.Duration) error {
+	return nil
+}
+
+func (f *fakeWA) MarkChatAsRead(ctx context.Context, target types.JID, read bool, lastMsgTS time.Time, lastMsgKey *waCommon.MessageKey) error {
 	return nil
 }
