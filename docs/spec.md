@@ -94,7 +94,7 @@ Immediately after QR pairing success, `wacli auth` runs a bootstrap sync:
 ### Tables (proposed)
 
 - `chats`
-  - `jid` (PK), `name`, `kind` (`dm|group|broadcast`), `last_message_ts`, …
+  - `jid` (PK), `name`, `kind` (`dm|group|broadcast`), `last_message_ts`, `archived`, `pinned`, `muted_until`, `unread`
 - `contacts`
   - `jid` (PK), `push_name`, `full_name`, `business_name`, `phone`, …
 - `groups`
@@ -185,8 +185,16 @@ WhatsApp Web history is best-effort. If you want to try fetching *older* message
 
 ### Chats
 
-- `wacli chats list [--query TEXT]`
+- `wacli chats list [--query TEXT] [--limit N] [--archived] [--no-archived] [--pinned] [--no-pinned] [--muted] [--no-muted] [--unread] [--no-unread]`
 - `wacli chats show --jid JID`
+- `wacli chats archive --jid JID`
+- `wacli chats unarchive --jid JID`
+- `wacli chats pin --jid JID`
+- `wacli chats unpin --jid JID`
+- `wacli chats mute --jid JID [--duration DURATION]`
+- `wacli chats unmute --jid JID`
+- `wacli chats mark-read --jid JID`
+- `wacli chats mark-unread --jid JID`
 
 ### Groups
 

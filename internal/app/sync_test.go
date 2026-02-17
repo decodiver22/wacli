@@ -8,6 +8,7 @@ import (
 	waProto "go.mau.fi/whatsmeow/binary/proto"
 	"go.mau.fi/whatsmeow/proto/waCommon"
 	"go.mau.fi/whatsmeow/proto/waHistorySync"
+	"go.mau.fi/whatsmeow/proto/waSyncAction"
 	"go.mau.fi/whatsmeow/proto/waWeb"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
@@ -232,6 +233,73 @@ func TestSyncStoresDisplayText(t *testing.T) {
 	}
 	if msg.DisplayText != "Reacted 👍 to hello" {
 		t.Fatalf("unexpected reaction display text: %q", msg.DisplayText)
+	}
+}
+
+func TestSyncChatStateEvents(t *testing.T) {
+	a := newTestApp(t)
+	f := newFakeWA()
+	a.wa = f
+
+	chat := types.JID{User: "456", Server: types.DefaultUserServer}
+	if err := a.db.UpsertChat(chat.String(), "dm", "Bob", time.Now()); err != nil {
+		t.Fatalf("UpsertChat: %v", err)
+	}
+
+	archiveEvt := &events.Archive{
+		JID:       chat,
+		Timestamp: time.Now(),
+		Action:    &waSyncAction.ArchiveChatAction{Archived: proto.Bool(true)},
+	}
+	pinEvt := &events.Pin{
+		JID:       chat,
+		Timestamp: time.Now(),
+		Action:    &waSyncAction.PinAction{Pinned: proto.Bool(true)},
+	}
+	muteEvt := &events.Mute{
+		JID:       chat,
+		Timestamp: time.Now(),
+		Action:    &waSyncAction.MuteAction{Muted: proto.Bool(true), MuteEndTimestamp: proto.Int64(-1)},
+	}
+	readEvt := &events.MarkChatAsRead{
+		JID:       chat,
+		Timestamp: time.Now(),
+		Action:    &waSyncAction.MarkChatAsReadAction{Read: proto.Bool(false)},
+	}
+
+	f.connectEvents = []interface{}{archiveEvt, pinEvt, muteEvt, readEvt}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		cancel()
+	}()
+	_, err := a.Sync(ctx, SyncOptions{
+		Mode:    SyncModeFollow,
+		AllowQR: false,
+	})
+	if err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+
+	c, err := a.db.GetChat(chat.String())
+	if err != nil {
+		t.Fatalf("GetChat: %v", err)
+	}
+
+	if !c.Archived {
+		t.Fatal("expected archived=true after Archive event")
+	}
+	// Archive event should have unpinned the chat, but a separate Pin event re-pinned it.
+	// The pin event comes after archive, so it should be true.
+	if !c.Pinned {
+		t.Fatal("expected pinned=true after Pin event")
+	}
+	if c.MutedUntil != -1 {
+		t.Fatalf("expected muted_until=-1, got %d", c.MutedUntil)
+	}
+	if !c.Unread {
+		t.Fatal("expected unread=true after MarkChatAsRead(read=false)")
 	}
 }
 

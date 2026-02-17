@@ -2,6 +2,13 @@
 
 ## 0.5.0 - Unreleased
 
+### Added
+
+- Chats: archive/unarchive, pin/unpin, mute/unmute, mark-read/mark-unread commands.
+- Chats: `chats list` shows archived/pinned/muted/unread flags; filter with `--archived`, `--pinned`, `--muted`, `--unread` (and `--no-*` negations).
+- Chats: `chats show` displays chat state fields.
+- Sync: chat states (archive, pin, mute, read) synced from WhatsApp during bootstrap and live follow mode.
+
 ### Fixed
 
 - Messages: resolve LID senders in group chats to real contact names or phone numbers (#18).
