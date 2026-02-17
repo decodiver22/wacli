@@ -217,17 +217,19 @@ func (d *DB) UpsertContact(jid, phone, pushName, fullName, firstName, businessNa
 	return err
 }
 
-func (d *DB) UpsertGroup(jid, name, ownerJID string, created time.Time) error {
+func (d *DB) UpsertGroup(jid, name, ownerJID string, created time.Time, isParent bool, linkedParentJID string) error {
 	now := time.Now().UTC().Unix()
 	_, err := d.sql.Exec(`
-		INSERT INTO groups(jid, name, owner_jid, created_ts, updated_at)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO groups(jid, name, owner_jid, created_ts, is_parent, linked_parent_jid, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(jid) DO UPDATE SET
 			name=COALESCE(NULLIF(excluded.name,''), groups.name),
 			owner_jid=COALESCE(NULLIF(excluded.owner_jid,''), groups.owner_jid),
 			created_ts=COALESCE(NULLIF(excluded.created_ts,0), groups.created_ts),
+			is_parent=excluded.is_parent,
+			linked_parent_jid=COALESCE(NULLIF(excluded.linked_parent_jid,''), groups.linked_parent_jid),
 			updated_at=excluded.updated_at
-	`, jid, name, ownerJID, unix(created), now)
+	`, jid, name, ownerJID, unix(created), isParent, linkedParentJID, now)
 	return err
 }
 
@@ -268,7 +270,7 @@ func (d *DB) ListGroups(query string, limit int) ([]Group, error) {
 	if limit <= 0 {
 		limit = 50
 	}
-	q := `SELECT jid, COALESCE(name,''), COALESCE(owner_jid,''), COALESCE(created_ts,0), updated_at FROM groups WHERE 1=1`
+	q := `SELECT jid, COALESCE(name,''), COALESCE(owner_jid,''), COALESCE(created_ts,0), updated_at, COALESCE(is_parent,0), COALESCE(linked_parent_jid,'') FROM groups WHERE 1=1`
 	var args []interface{}
 	if strings.TrimSpace(query) != "" {
 		needle := "%" + query + "%"
@@ -288,7 +290,7 @@ func (d *DB) ListGroups(query string, limit int) ([]Group, error) {
 	for rows.Next() {
 		var g Group
 		var created, updated int64
-		if err := rows.Scan(&g.JID, &g.Name, &g.OwnerJID, &created, &updated); err != nil {
+		if err := rows.Scan(&g.JID, &g.Name, &g.OwnerJID, &created, &updated, &g.IsParent, &g.LinkedParentJID); err != nil {
 			return nil, err
 		}
 		g.CreatedAt = fromUnix(created)

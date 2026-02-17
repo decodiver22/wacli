@@ -23,11 +23,13 @@ func (c Chat) Muted() bool {
 }
 
 type Group struct {
-	JID       string
-	Name      string
-	OwnerJID  string
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	JID             string
+	Name            string
+	OwnerJID        string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	IsParent        bool
+	LinkedParentJID string
 }
 
 type GroupParticipant struct {

@@ -19,6 +19,7 @@ var schemaMigrations = []migration{
 	{version: 2, name: "messages display_text column", up: migrateMessagesDisplayText},
 	{version: 3, name: "messages fts", up: migrateMessagesFTS},
 	{version: 4, name: "chat state columns", up: migrateChatState},
+	{version: 5, name: "group community columns", up: migrateGroupCommunity},
 }
 
 func (d *DB) ensureSchema() error {
@@ -284,6 +285,23 @@ func migrateChatState(d *DB) error {
 		if _, err := d.sql.Exec(c.ddl); err != nil {
 			return fmt.Errorf("add %s column: %w", c.name, err)
 		}
+	}
+	return nil
+}
+
+func migrateGroupCommunity(d *DB) error {
+	has, err := d.tableHasColumn("groups", "is_parent")
+	if err != nil {
+		return err
+	}
+	if has {
+		return nil
+	}
+	if _, err := d.sql.Exec(`ALTER TABLE groups ADD COLUMN is_parent BOOLEAN NOT NULL DEFAULT 0`); err != nil {
+		return fmt.Errorf("add is_parent column: %w", err)
+	}
+	if _, err := d.sql.Exec(`ALTER TABLE groups ADD COLUMN linked_parent_jid TEXT`); err != nil {
+		return fmt.Errorf("add linked_parent_jid column: %w", err)
 	}
 	return nil
 }

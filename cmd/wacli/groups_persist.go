@@ -9,7 +9,7 @@ func persistGroupInfo(db *store.DB, info *types.GroupInfo) error {
 	if info == nil {
 		return nil
 	}
-	if err := db.UpsertGroup(info.JID.String(), info.GroupName.Name, info.OwnerJID.String(), info.GroupCreated); err != nil {
+	if err := db.UpsertGroup(info.JID.String(), info.GroupName.Name, info.OwnerJID.String(), info.GroupCreated, info.IsParent, info.LinkedParentJID.String()); err != nil {
 		return err
 	}
 	var ps []store.GroupParticipant
