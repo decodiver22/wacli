@@ -15,6 +15,17 @@ import (
 	"go.mau.fi/whatsmeow/types/events"
 )
 
+// resolveChatJID returns the JID string to use for DB lookups.
+// If the JID is a LID, it tries to resolve it to a phone-number JID.
+func (a *App) resolveChatJID(jid types.JID) string {
+	if jid.Server == "lid" {
+		if pn, err := a.wa.GetPNForLID(context.Background(), jid); err == nil && !pn.IsEmpty() {
+			return pn.ToNonAD().String()
+		}
+	}
+	return jid.String()
+}
+
 type SyncMode string
 
 const (
@@ -142,14 +153,15 @@ func (a *App) Sync(ctx context.Context, opts SyncOptions) (SyncResult, error) {
 			}
 		case *events.Archive:
 			if v.Action != nil {
-				_ = a.db.SetChatArchived(v.JID.String(), v.Action.GetArchived())
+				chatJID := a.resolveChatJID(v.JID)
+				_ = a.db.SetChatArchived(chatJID, v.Action.GetArchived())
 				if v.Action.GetArchived() {
-					_ = a.db.SetChatPinned(v.JID.String(), false)
+					_ = a.db.SetChatPinned(chatJID, false)
 				}
 			}
 		case *events.Pin:
 			if v.Action != nil {
-				_ = a.db.SetChatPinned(v.JID.String(), v.Action.GetPinned())
+				_ = a.db.SetChatPinned(a.resolveChatJID(v.JID), v.Action.GetPinned())
 			}
 		case *events.Mute:
 			if v.Action != nil {
@@ -165,11 +177,11 @@ func (a *App) Sync(ctx context.Context, opts SyncOptions) (SyncResult, error) {
 						mu = -1
 					}
 				}
-				_ = a.db.SetChatMutedUntil(v.JID.String(), mu)
+				_ = a.db.SetChatMutedUntil(a.resolveChatJID(v.JID), mu)
 			}
 		case *events.MarkChatAsRead:
 			if v.Action != nil {
-				_ = a.db.SetChatUnread(v.JID.String(), !v.Action.GetRead())
+				_ = a.db.SetChatUnread(a.resolveChatJID(v.JID), !v.Action.GetRead())
 			}
 		}
 	})
