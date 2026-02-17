@@ -93,6 +93,54 @@ func (h *syncHandler) DeleteMessage(chat, msgID string, forEveryone bool) error 
 	return waClient.RevokeMessage(ctx, chatJID, msgID, forEveryone)
 }
 
+func (h *syncHandler) ChatState(jid, action, duration string) error {
+	if h.app == nil {
+		return fmt.Errorf("app not initialized")
+	}
+	if h.app.WA() == nil {
+		return fmt.Errorf("whatsapp client not initialized")
+	}
+	if !h.app.WA().IsConnected() {
+		return fmt.Errorf("whatsapp not connected")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	chatJID, err := wa.ParseUserOrJID(jid)
+	if err != nil {
+		return fmt.Errorf("parse jid: %w", err)
+	}
+
+	switch action {
+	case "archive":
+		return h.app.ArchiveChat(ctx, chatJID, true)
+	case "unarchive":
+		return h.app.ArchiveChat(ctx, chatJID, false)
+	case "pin":
+		return h.app.PinChat(ctx, chatJID, true)
+	case "unpin":
+		return h.app.PinChat(ctx, chatJID, false)
+	case "mute":
+		var dur time.Duration
+		if duration != "" {
+			dur, err = time.ParseDuration(duration)
+			if err != nil {
+				return fmt.Errorf("invalid duration: %w", err)
+			}
+		}
+		return h.app.MuteChat(ctx, chatJID, true, dur)
+	case "unmute":
+		return h.app.MuteChat(ctx, chatJID, false, 0)
+	case "mark-read":
+		return h.app.MarkChatRead(ctx, chatJID, true)
+	case "mark-unread":
+		return h.app.MarkChatRead(ctx, chatJID, false)
+	default:
+		return fmt.Errorf("unknown chat state action: %s", action)
+	}
+}
+
 func newSyncCmd(flags *rootFlags) *cobra.Command {
 	var once bool
 	var follow bool

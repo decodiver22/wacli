@@ -20,7 +20,7 @@ const (
 
 // Request represents a command sent to the sync daemon.
 type Request struct {
-	Command     string `json:"command"` // "send_text", "send_file", "delete_message", "ping"
+	Command     string `json:"command"` // "send_text", "send_file", "delete_message", "chat_state", "ping"
 	To          string `json:"to,omitempty"`
 	Message     string `json:"message,omitempty"`
 	File        string `json:"file,omitempty"`
@@ -28,6 +28,8 @@ type Request struct {
 	Chat        string `json:"chat,omitempty"`
 	MsgID       string `json:"msg_id,omitempty"`
 	ForEveryone bool   `json:"for_everyone,omitempty"`
+	Action      string `json:"action,omitempty"`   // chat_state: archive, unarchive, pin, unpin, mute, unmute, mark-read, mark-unread
+	Duration    string `json:"duration,omitempty"` // chat_state mute: duration string (e.g. "8h")
 }
 
 // Response represents the result from the sync daemon.
@@ -47,6 +49,7 @@ type SendTextResult struct {
 type Handler interface {
 	SendText(to, message string) (msgID string, err error)
 	DeleteMessage(chat, msgID string, forEveryone bool) error
+	ChatState(jid, action, duration string) error
 }
 
 // Server listens on a Unix socket for IPC requests.
@@ -184,7 +187,21 @@ func (s *Server) processRequest(req Request) Response {
 			"msg_id":       req.MsgID,
 			"for_everyone": req.ForEveryone,
 		}}
-	
+
+	case "chat_state":
+		if req.Chat == "" || req.Action == "" {
+			return Response{Success: false, Error: "chat and action are required"}
+		}
+		err := s.handler.ChatState(req.Chat, req.Action, req.Duration)
+		if err != nil {
+			return Response{Success: false, Error: err.Error()}
+		}
+		return Response{Success: true, Data: map[string]any{
+			"action": req.Action,
+			"jid":    req.Chat,
+			"ok":     true,
+		}}
+
 	default:
 		return Response{Success: false, Error: fmt.Sprintf("unknown command: %s", req.Command)}
 	}
@@ -272,6 +289,27 @@ func (c *Client) DeleteMessage(chat, msgID string, forEveryone bool) error {
 		return fmt.Errorf("%s", resp.Error)
 	}
 	
+	return nil
+}
+
+// ChatState sends a chat state action (archive, pin, mute, etc.) via the sync daemon.
+func (c *Client) ChatState(jid, action, duration string) error {
+	req := Request{
+		Command:  "chat_state",
+		Chat:     jid,
+		Action:   action,
+		Duration: duration,
+	}
+
+	resp, err := c.send(req)
+	if err != nil {
+		return err
+	}
+
+	if !resp.Success {
+		return fmt.Errorf("%s", resp.Error)
+	}
+
 	return nil
 }
 
