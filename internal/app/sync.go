@@ -10,6 +10,7 @@ import (
 
 	"github.com/steipete/wacli/internal/store"
 	"github.com/steipete/wacli/internal/wa"
+	"go.mau.fi/whatsmeow/appstate"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 )
@@ -28,9 +29,10 @@ type SyncOptions struct {
 	OnQRCode        func(string)
 	AfterConnect    func(context.Context) error
 	DownloadMedia   bool
-	RefreshContacts bool
-	RefreshGroups   bool
-	IdleExit        time.Duration // only used for bootstrap/once
+	RefreshContacts  bool
+	RefreshGroups    bool
+	RefreshChatState bool
+	IdleExit         time.Duration // only used for bootstrap/once
 	Verbosity       int           // future
 }
 
@@ -192,6 +194,12 @@ func (a *App) Sync(ctx context.Context, opts SyncOptions) (SyncResult, error) {
 	}
 	if opts.RefreshGroups {
 		_ = a.refreshGroups(ctx)
+	}
+	if opts.RefreshChatState {
+		// Fetch app state patches to sync archive/pin/mute/read status.
+		// regular_low has pin and archive; regular_high has mute and starred.
+		_ = a.wa.FetchAppState(ctx, appstate.WAPatchRegularLow, true, false)
+		_ = a.wa.FetchAppState(ctx, appstate.WAPatchRegularHigh, true, false)
 	}
 	if opts.AfterConnect != nil {
 		if err := opts.AfterConnect(ctx); err != nil {

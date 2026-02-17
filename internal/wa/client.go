@@ -11,6 +11,7 @@ import (
 
 	"github.com/mdp/qrterminal/v3"
 	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/appstate"
 	waProto "go.mau.fi/whatsmeow/binary/proto"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types"
@@ -62,6 +63,7 @@ func (c *Client) init() error {
 
 	logger := waLog.Stdout("Client", "ERROR", true)
 	c.client = whatsmeow.NewClient(deviceStore, logger)
+	c.client.EmitAppStateEventsOnFullSync = true
 	return nil
 }
 
@@ -390,6 +392,18 @@ func (c *Client) OwnJID() types.JID {
 		return types.JID{}
 	}
 	return cli.Store.ID.ToNonAD()
+}
+
+// FetchAppState fetches app state patches (chat settings like archive, pin, mute).
+// If fullSync is true, cached state is cleared and all patches are re-fetched.
+func (c *Client) FetchAppState(ctx context.Context, name appstate.WAPatchName, fullSync, onlyIfNotSynced bool) error {
+	c.mu.Lock()
+	cli := c.client
+	c.mu.Unlock()
+	if cli == nil || !cli.IsConnected() {
+		return fmt.Errorf("not connected")
+	}
+	return cli.FetchAppState(ctx, name, fullSync, onlyIfNotSynced)
 }
 
 // RevokeMessage deletes a message (revokes it for everyone or just locally).

@@ -10,6 +10,7 @@ import (
 
 	"github.com/steipete/wacli/internal/wa"
 	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/appstate"
 	waProto "go.mau.fi/whatsmeow/binary/proto"
 	"go.mau.fi/whatsmeow/proto/waCommon"
 	"go.mau.fi/whatsmeow/types"
@@ -260,6 +261,10 @@ func (f *fakeWA) Logout(ctx context.Context) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.authed = false
+	return nil
+}
+
+func (f *fakeWA) FetchAppState(ctx context.Context, name appstate.WAPatchName, fullSync, onlyIfNotSynced bool) error {
 	return nil
 }
 

@@ -148,6 +148,7 @@ func newSyncCmd(flags *rootFlags) *cobra.Command {
 	var downloadMedia bool
 	var refreshContacts bool
 	var refreshGroups bool
+	var refreshChatState bool
 	var enableIPC bool
 
 	cmd := &cobra.Command{
@@ -189,12 +190,13 @@ func newSyncCmd(flags *rootFlags) *cobra.Command {
 			}
 
 			res, err := a.Sync(ctx, appPkg.SyncOptions{
-				Mode:            mode,
-				AllowQR:         false,
-				DownloadMedia:   downloadMedia,
-				RefreshContacts: refreshContacts,
-				RefreshGroups:   refreshGroups,
-				IdleExit:        idleExit,
+				Mode:             mode,
+				AllowQR:          false,
+				DownloadMedia:    downloadMedia,
+				RefreshContacts:  refreshContacts,
+				RefreshGroups:    refreshGroups,
+				RefreshChatState: refreshChatState,
+				IdleExit:         idleExit,
 			})
 			if err != nil {
 				return err
@@ -217,6 +219,7 @@ func newSyncCmd(flags *rootFlags) *cobra.Command {
 	cmd.Flags().BoolVar(&downloadMedia, "download-media", false, "download media in the background during sync")
 	cmd.Flags().BoolVar(&refreshContacts, "refresh-contacts", false, "refresh contacts from session store into local DB")
 	cmd.Flags().BoolVar(&refreshGroups, "refresh-groups", false, "refresh joined groups (live) into local DB")
+	cmd.Flags().BoolVar(&refreshChatState, "refresh-chat-state", false, "sync archive/pin/mute/read status from WhatsApp")
 	cmd.Flags().BoolVar(&enableIPC, "enable-ipc", true, "enable IPC socket for send commands (--follow mode only)")
 	return cmd
 }
