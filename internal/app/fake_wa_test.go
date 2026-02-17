@@ -28,6 +28,7 @@ type fakeWA struct {
 
 	contacts map[types.JID]types.ContactInfo
 	groups   map[types.JID]*types.GroupInfo
+	lidMap   map[types.JID]types.JID // LID → phone number
 
 	onDemandHistory func(lastKnown types.MessageInfo, count int) *events.HistorySync
 }
@@ -38,6 +39,7 @@ func newFakeWA() *fakeWA {
 		handlers:      map[uint32]func(interface{}){},
 		contacts:      map[types.JID]types.ContactInfo{},
 		groups:        map[types.JID]*types.GroupInfo{},
+		lidMap:        map[types.JID]types.JID{},
 		nextHandlerID: 1,
 	}
 }
@@ -133,6 +135,15 @@ func (f *fakeWA) GetAllContacts(ctx context.Context) (map[types.JID]types.Contac
 		out[k] = v
 	}
 	return out, nil
+}
+
+func (f *fakeWA) GetPNForLID(ctx context.Context, lid types.JID) (types.JID, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if pn, ok := f.lidMap[lid]; ok {
+		return pn, nil
+	}
+	return types.JID{}, fmt.Errorf("LID not found")
 }
 
 func (f *fakeWA) GetJoinedGroups(ctx context.Context) ([]*types.GroupInfo, error) {

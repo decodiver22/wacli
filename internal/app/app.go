@@ -28,6 +28,7 @@ type WAClient interface {
 	ResolveChatName(ctx context.Context, chat types.JID, pushName string) string
 	GetContact(ctx context.Context, jid types.JID) (types.ContactInfo, error)
 	GetAllContacts(ctx context.Context) (map[types.JID]types.ContactInfo, error)
+	GetPNForLID(ctx context.Context, lid types.JID) (types.JID, error)
 
 	GetJoinedGroups(ctx context.Context) ([]*types.GroupInfo, error)
 	GetGroupInfo(ctx context.Context, jid types.JID) (*types.GroupInfo, error)

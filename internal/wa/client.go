@@ -262,6 +262,16 @@ func IsGroupJID(jid types.JID) bool {
 	return jid.Server == types.GroupServer
 }
 
+func (c *Client) GetPNForLID(ctx context.Context, lid types.JID) (types.JID, error) {
+	c.mu.Lock()
+	cli := c.client
+	c.mu.Unlock()
+	if cli == nil || cli.Store == nil || cli.Store.LIDs == nil {
+		return types.JID{}, fmt.Errorf("LID store not available")
+	}
+	return cli.Store.LIDs.GetPNForLID(ctx, lid)
+}
+
 func (c *Client) GetContact(ctx context.Context, jid types.JID) (types.ContactInfo, error) {
 	c.mu.Lock()
 	cli := c.client

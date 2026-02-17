@@ -252,13 +252,20 @@ func (a *App) storeParsedMessage(ctx context.Context, pm wa.ParsedMessage) error
 	}
 	if pm.SenderJID != "" {
 		if jid, err := types.ParseJID(pm.SenderJID); err == nil {
-			if info, err := a.wa.GetContact(ctx, jid.ToNonAD()); err == nil {
+			contactJID := jid.ToNonAD()
+			// Resolve LID → phone number so the contact lookup succeeds.
+			if jid.Server == types.HiddenUserServer {
+				if pn, err := a.wa.GetPNForLID(ctx, jid); err == nil && !pn.IsEmpty() {
+					contactJID = pn
+				}
+			}
+			if info, err := a.wa.GetContact(ctx, contactJID); err == nil {
 				if name := wa.BestContactName(info); name != "" {
 					senderName = name
 				}
 				_ = a.db.UpsertContact(
-					jid.String(),
-					jid.User,
+					contactJID.String(),
+					contactJID.User,
 					info.PushName,
 					info.FullName,
 					info.FirstName,

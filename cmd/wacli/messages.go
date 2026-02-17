@@ -71,6 +71,8 @@ func newMessagesListCmd(flags *rootFlags) *cobra.Command {
 				return err
 			}
 
+			a.ResolveSenderNames(ctx, msgs)
+
 			if flags.asJSON {
 				return out.WriteJSON(os.Stdout, map[string]any{
 					"messages": msgs,
@@ -82,6 +84,9 @@ func newMessagesListCmd(flags *rootFlags) *cobra.Command {
 			fmt.Fprintln(w, "TIME\tCHAT\tFROM\tID\tTEXT")
 			for _, m := range msgs {
 				from := m.SenderJID
+				if m.SenderName != "" {
+					from = m.SenderName
+				}
 				if m.FromMe {
 					from = "me"
 				}
@@ -168,6 +173,8 @@ func newMessagesSearchCmd(flags *rootFlags) *cobra.Command {
 				return err
 			}
 
+			a.ResolveSenderNames(ctx, msgs)
+
 			if flags.asJSON {
 				return out.WriteJSON(os.Stdout, map[string]any{
 					"messages": msgs,
@@ -179,6 +186,9 @@ func newMessagesSearchCmd(flags *rootFlags) *cobra.Command {
 			fmt.Fprintf(w, "TIME\tCHAT\tFROM\tID\tMATCH\n")
 			for _, m := range msgs {
 				fromLabel := m.SenderJID
+				if m.SenderName != "" {
+					fromLabel = m.SenderName
+				}
 				if m.FromMe {
 					fromLabel = "me"
 				}
@@ -244,6 +254,10 @@ func newMessagesShowCmd(flags *rootFlags) *cobra.Command {
 				return err
 			}
 
+			msgs := []store.Message{m}
+			a.ResolveSenderNames(ctx, msgs)
+			m = msgs[0]
+
 			if flags.asJSON {
 				return out.WriteJSON(os.Stdout, m)
 			}
@@ -254,11 +268,14 @@ func newMessagesShowCmd(flags *rootFlags) *cobra.Command {
 			}
 			fmt.Fprintf(os.Stdout, "ID: %s\n", m.MsgID)
 			fmt.Fprintf(os.Stdout, "Time: %s\n", m.Timestamp.Local().Format(time.RFC3339))
-			if m.FromMe {
-				fmt.Fprintf(os.Stdout, "From: me\n")
-			} else {
-				fmt.Fprintf(os.Stdout, "From: %s\n", m.SenderJID)
+			from := m.SenderJID
+			if m.SenderName != "" {
+				from = m.SenderName
 			}
+			if m.FromMe {
+				from = "me"
+			}
+			fmt.Fprintf(os.Stdout, "From: %s\n", from)
 			if m.MediaType != "" {
 				fmt.Fprintf(os.Stdout, "Media: %s\n", m.MediaType)
 			}
@@ -300,6 +317,8 @@ func newMessagesContextCmd(flags *rootFlags) *cobra.Command {
 				return err
 			}
 
+			a.ResolveSenderNames(ctx, msgs)
+
 			if flags.asJSON {
 				return out.WriteJSON(os.Stdout, msgs)
 			}
@@ -308,6 +327,9 @@ func newMessagesContextCmd(flags *rootFlags) *cobra.Command {
 			fmt.Fprintln(w, "TIME\tFROM\tID\tTEXT")
 			for _, m := range msgs {
 				from := m.SenderJID
+				if m.SenderName != "" {
+					from = m.SenderName
+				}
 				if m.FromMe {
 					from = "me"
 				}

@@ -2,6 +2,10 @@
 
 ## 0.5.0 - Unreleased
 
+### Fixed
+
+- Messages: resolve LID senders in group chats to real contact names or phone numbers (#18).
+
 ### Changed
 
 - Internal architecture: split store and groups command logic into focused modules for cleaner maintenance and safer follow-up changes.
